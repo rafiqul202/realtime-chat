@@ -3,8 +3,8 @@ import useUserName from "@/app/hooks/useUserName";
 import { client } from "@/lib/client";
 import { formateTimeRemaining } from "@/lib/formateTimeRemaining";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useParams } from "next/navigation";
-import { useRef, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { useRealtime } from "@/lib/realtime-client";
@@ -12,9 +12,10 @@ import { useRealtime } from "@/lib/realtime-client";
 const RoomIdPage = () => {
   const { username } = useUserName();
   const params = useParams();
+  const router = useRouter();
   const roomId = params.roomId as string;
   const [copyStatus, setCopyStatus] = useState("Copy");
-  const [timeRemaining, setTimeRemainig] = useState<number | null>(250);
+  const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
   const [textInput, setTextInput] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -25,7 +26,37 @@ const RoomIdPage = () => {
     toast.success(`Successfully Copy- ${roomId}`, { position: "top-right" });
     setTimeout(() => setCopyStatus("Copy"), 2000);
   };
+  // time to time out function
+  const { data: ttlData } = useQuery({
+    queryKey: ["ttl", roomId],
+    queryFn: async () => {
+      const res = await client.room.ttl.get({ query: { roomId } });
+      return res.data;
+    },
+  });
 
+  useEffect(() => {
+    if (ttlData?.ttl !== undefined) {
+      setTimeRemaining(ttlData?.ttl);
+    }
+  }, [ttlData]);
+
+  useEffect(() => {
+    if (timeRemaining === null || timeRemaining < 0) return;
+    if (timeRemaining === 0) {
+      return router.push("/?destroyed=true");
+    }
+    const interval = setInterval(() => {
+      setTimeRemaining((priv) => {
+        if (priv === null || priv <= 1) {
+          clearInterval(interval);
+          return 0;
+        }
+        return priv - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [timeRemaining, router]);
   const { data: messages, refetch } = useQuery({
     queryKey: ["messages", roomId],
     queryFn: async () => {
@@ -41,6 +72,7 @@ const RoomIdPage = () => {
         { sender: username, text },
         { query: { roomId } },
       );
+      setTextInput("");
     },
   });
 
@@ -49,6 +81,9 @@ const RoomIdPage = () => {
     events: ["chat.message", "chat.destroy"],
     onData: ({ event }) => {
       if (event === "chat.message") refetch();
+      if (event === "chat.destroy") {
+        router.push("/?destroyed=true");
+      }
     },
   });
 
@@ -124,8 +159,8 @@ const RoomIdPage = () => {
       {/* input section */}
       <div className="p-4 border-t border-zinc-800 bg-zinc-900/30">
         <div className="flex gap-4">
-          <div className="flex-1 relative group">
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-green-400 text-2xl animate-pulse">
+          <div className="flex-1 relative group ">
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-green-400 text-2xl animate-pulse ">
               {">"}
             </span>
             <input
@@ -140,7 +175,7 @@ const RoomIdPage = () => {
                 }
               }}
               placeholder="Type Message..."
-              className="w-full bg-black border-zinc-800 focus:border-zinc-700 focus:outline-none transition-colors text-zinc-100 placeholder:text-zinc-600 py-3 pl-8 pr-4 text-sm"
+              className="w-full bg-gray-700 border-zinc-800 focus:border-zinc-700 focus:outline-none transition-colors text-green-300 placeholder:text-zinc-600 py-3 pl-8 pr-4 text-sm rounded-md"
             />
           </div>
           <button
@@ -148,7 +183,7 @@ const RoomIdPage = () => {
               (sendMessage({ text: textInput }), inputRef.current?.focus());
             }}
             disabled={isPending || !textInput.trim()}
-            className="bg-zinc-800 text-zinc-100 px-6 text-sm font-bold hover:text-zinc-200 transition-all disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+            className="bg-white text-black rounded-2xl px-6 text-sm font-bold hover:text-zinc-200 transition-all disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
           >
             SEND
           </button>
