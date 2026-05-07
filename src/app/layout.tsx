@@ -34,7 +34,7 @@ export default function RootLayout({
         geist.variable,
       )}
     >
-      <body className="min-h-full flex flex-col bg-zinc-900">
+      <body className="container min-h-full flex flex-col mx-auto bg-zinc-900">
         <Provider>{children}</Provider>
         <Toaster theme="dark" style={{ background: "zinc-800" }} />
       </body>
