@@ -3,8 +3,17 @@ import { client } from "@/lib/client";
 import { useMutation } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import useUserName from "./hooks/useUserName";
+import { Suspense } from "react";
+import { Spinner } from "@/components/ui/spinner";
 
-export default function Home() {
+ const HomePage =() => {
+   return (
+     <Suspense fallback={<Spinner />}>
+       <Lobby/>
+    </Suspense>
+  )
+}
+ function Lobby() {
   const { username } = useUserName();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -84,3 +93,5 @@ export default function Home() {
     </main>
   );
 }
+
+export default HomePage;
